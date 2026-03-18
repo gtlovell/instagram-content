@@ -1,0 +1,23 @@
+{
+  "name": "instagram-content",
+  "version": "1.0.0",
+  "description": "Instagram content research agent for CleanStreak",
+  "type": "module",
+  "main": "research.js",
+  "scripts": {
+    "research": "node research.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:37971/git/gtlovell/instagram-content"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.79.0",
+    "apify-client": "^2.22.2",
+    "dotenv": "^17.3.1",
+    "googleapis": "^171.4.0"
+  }
+}
