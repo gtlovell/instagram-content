@@ -6,7 +6,8 @@
   "main": "research.js",
   "scripts": {
     "research": "node research.js",
-    "generate": "node generate.js"
+    "generate": "node generate.js",
+    "track": "node track.js"
   },
   "repository": {
     "type": "git",
