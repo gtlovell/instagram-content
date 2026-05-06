@@ -3,302 +3,296 @@ import { ApifyClient } from "apify-client";
 import Anthropic from "@anthropic-ai/sdk";
 import { google } from "googleapis";
 import { readFileSync, mkdirSync, writeFileSync } from "fs";
+import { requireEnv, withRetry } from "./lib/retry.js";
 
 // ── Config ──────────────────────────────────────────────────────────────────
-const APIFY_TOKEN = process.env.APIFY_TOKEN;
+const APIFY_TOKEN       = process.env.APIFY_TOKEN;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const SHEETS_ID = process.env.SHEETS_ID;
-const CREDENTIALS_PATH = "./credentials/sheets-service-account.json";
+const SHEETS_ID         = process.env.SHEETS_ID;
+const CREDENTIALS_PATH  = process.env.GOOGLE_CREDENTIALS_PATH || "./credentials/sheets-service-account.json";
 
-const HASHTAGS = [
-  "#ultraprocessedfood",
-  "#upffree",
-  "#cleanstreak",
-  "#foodlabels",
-  "#processedfoods",
+// Keywords used to search LinkedIn for relevant posts
+const SEARCH_KEYWORDS = [
+  "ultra processed food",
+  "food labels ingredients",
+  "UPF health",
+  "processed food hidden sugar",
+  "clean eating habits",
+  "food additives",
+  "ingredient list reading",
+  "nutrition label decoded",
 ];
 
-const POSTS_PER_HASHTAG = 20;
+const POSTS_PER_KEYWORD = 15;
 
-// ── Apify: Scrape Instagram posts by hashtag ────────────────────────────────
-async function scrapeInstagramPosts() {
+// ── Apify: Scrape LinkedIn posts by keyword ─────────────────────────────────
+async function scrapeLinkedInPosts() {
   const client = new ApifyClient({ token: APIFY_TOKEN });
 
-  console.log("Scraping Instagram posts for hashtags:", HASHTAGS.join(", "));
+  console.log("Scraping LinkedIn posts for keywords:", SEARCH_KEYWORDS.join(", "));
 
+  // Apify actor: curious_coder/linkedin-post-search
+  // Searches LinkedIn posts by keyword and returns post data
   const input = {
-    hashtags: HASHTAGS,
-    resultsLimit: POSTS_PER_HASHTAG,
-    resultsType: "posts",
-    searchType: "hashtag",
+    keywords: SEARCH_KEYWORDS,
+    maxResults: POSTS_PER_KEYWORD,
+    proxy: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
   };
 
-  const run = await client.actor("apify/instagram-scraper").call(input);
-  const { items } = await client.dataset(run.defaultDatasetId).listItems();
+  const run = await withRetry("Apify LinkedIn search", () =>
+    client.actor("curious_coder/linkedin-post-search").call(input, {
+      timeoutSecs: 300,
+    })
+  );
+  const { items } = await withRetry("Apify dataset read", () =>
+    client.dataset(run.defaultDatasetId).listItems()
+  );
 
-  console.log(`Scraped ${items.length} raw posts`);
+  console.log(`Scraped ${items.length} raw LinkedIn posts`);
 
-  return items.map(normalizePost);
+  return items.map(normalizePost).filter(Boolean);
 }
 
 function normalizePost(item) {
-  const caption = item.caption || "";
-  const firstLine = caption.split("\n")[0].trim();
-  const hashtagMatches = caption.match(/#[\w]+/g) || [];
+  try {
+    const text = item.text || item.commentary || item.content || "";
+    const firstLine = text.split("\n")[0].trim();
 
-  let postType = "single";
-  if (item.type === "Video" || item.videoUrl) postType = "reel";
-  else if (
-    (item.images && item.images.length > 1) ||
-    (item.childPosts && item.childPosts.length > 0) ||
-    item.type === "Sidecar"
-  )
-    postType = "carousel";
-
-  return {
-    account: item.ownerUsername || item.ownerFullName || "unknown",
-    caption,
-    hook: firstLine,
-    hashtags: hashtagMatches,
-    likes: item.likesCount ?? item.likes ?? 0,
-    comments: item.commentsCount ?? item.comments ?? 0,
-    saves: item.savesCount ?? null,
-    postType,
-    url: item.url || item.shortCode ? `https://www.instagram.com/p/${item.shortCode}/` : "",
-    timestamp: item.timestamp || item.takenAtTimestamp || null,
-  };
+    return {
+      authorName:   item.authorName || item.author?.name || "Unknown",
+      authorTitle:  item.authorTitle || item.author?.headline || "",
+      authorFollowers: item.authorFollowers || item.author?.followersCount || 0,
+      text:         text,
+      firstLine:    firstLine,
+      likes:        item.likesCount       || item.numLikes       || 0,
+      comments:     item.commentsCount    || item.numComments    || 0,
+      reposts:      item.repostsCount     || item.numReposts     || 0,
+      postType:     item.type             || "text",
+      url:          item.url              || item.postUrl        || "",
+      postedAt:     item.postedAt         || item.createdAt      || "",
+    };
+  } catch {
+    return null;
+  }
 }
 
-// ── Claude: Analyze posts ───────────────────────────────────────────────────
-async function analyzeWithClaude(posts) {
-  const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+// ── Filter: engagement threshold ────────────────────────────────────────────
+function filterEngaged(posts) {
+  const scored = posts.map((p) => ({
+    ...p,
+    engagementScore: p.likes + p.comments * 3 + p.reposts * 5,
+  }));
 
-  console.log("Sending data to Claude for analysis...");
+  scored.sort((a, b) => b.engagementScore - a.engagementScore);
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
-    messages: [
-      {
-        role: "user",
-        content: `You are an Instagram content strategist specializing in health/wellness niches.
-
-I run CleanStreak, a UPF (ultra-processed food) tracking app. Below are the top recent Instagram posts from hashtags in my niche: #ultraprocessedfood #upffree #cleanstreak #foodlabels #processedfoods.
-
-Analyze these posts and return ONLY valid JSON (no markdown fences) with this exact structure:
-
-{
-  "hookFormulas": [
-    { "formula": "...", "example": "...", "whyItWorks": "..." }
-  ],
-  "carouselStructures": [
-    { "structure": "...", "slideBreakdown": "...", "example": "..." }
-  ],
-  "recurringCTAs": [
-    { "cta": "...", "frequency": "...", "context": "..." }
-  ],
-  "emotionalTriggers": [
-    { "trigger": "...", "howUsed": "...", "effectiveness": "..." }
-  ],
-  "contentGaps": [
-    { "gap": "...", "opportunity": "...", "suggestedAngle": "..." }
-  ],
-  "summary": "..."
-}
-
-Provide exactly: top 5 hook formulas, top 3 carousel structures, all recurring CTAs you find, emotional triggers used, and content gaps/opportunities for CleanStreak.
-
-Here are the posts:
-${JSON.stringify(posts, null, 2)}`,
-      },
-    ],
+  // Deduplicate by URL
+  const seen = new Set();
+  const unique = scored.filter((p) => {
+    if (!p.url || seen.has(p.url)) return false;
+    seen.add(p.url);
+    return true;
   });
 
-  const text = message.content[0].text;
-
-  // Parse JSON from response (handle possible markdown fences)
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("Claude did not return valid JSON. Raw response:\n" + text);
-  }
-
-  const analysis = JSON.parse(jsonMatch[0]);
-  console.log("Claude analysis complete.");
-  return analysis;
+  const top = unique.slice(0, 40);
+  console.log(`Filtered to ${top.length} unique engaged posts`);
+  return top;
 }
 
-// ── Google Sheets: Write data ───────────────────────────────────────────────
-async function getGoogleSheetsClient() {
+// ── Google Sheets ────────────────────────────────────────────────────────────
+async function getSheetsClient() {
   const credentials = JSON.parse(readFileSync(CREDENTIALS_PATH, "utf8"));
-
   const auth = new google.auth.GoogleAuth({
     credentials,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
-
-  const sheets = google.sheets({ version: "v4", auth });
-  return sheets;
+  return google.sheets({ version: "v4", auth });
 }
 
 async function ensureSheet(sheets, title) {
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEETS_ID });
+  const meta = await withRetry(`Sheets metadata for ${title}`, () =>
+    sheets.spreadsheets.get({ spreadsheetId: SHEETS_ID })
+  );
   const exists = meta.data.sheets.some((s) => s.properties.title === title);
   if (!exists) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SHEETS_ID,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title } } }],
-      },
-    });
+    await withRetry(`Create ${title} sheet`, () =>
+      sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEETS_ID,
+        requestBody: { requests: [{ addSheet: { properties: { title } } }] },
+      })
+    );
   }
 }
 
-async function clearAndWrite(sheets, range, values) {
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId: SHEETS_ID,
-    range,
-  });
+async function appendToResearchTab(sheets, posts) {
+  console.log('Appending to "Research" tab in Sheets...');
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEETS_ID,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values },
-  });
-}
-
-async function writeResearchToSheets(sheets, posts) {
   await ensureSheet(sheets, "Research");
 
-  const header = [
-    "Account",
-    "Hook",
-    "Caption",
-    "Hashtags",
-    "Likes",
-    "Comments",
-    "Saves",
-    "Post Type",
-    "URL",
-    "Timestamp",
+  const HEADER = [
+    "Scraped At", "Author", "Title", "Followers",
+    "Likes", "Comments", "Reposts", "Engagement Score",
+    "Post Type", "First Line", "URL",
   ];
 
+  const existing = await withRetry("Read Research header", () =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId: SHEETS_ID,
+      range: "Research!A1:A1",
+    })
+  ).catch(() => ({ data: { values: [] } }));
+
+  if (!existing.data.values?.length) {
+    await withRetry("Write Research header", () =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: "Research!A1",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [HEADER] },
+      })
+    );
+  }
+
+  const now = new Date().toISOString().slice(0, 10);
   const rows = posts.map((p) => [
-    p.account,
-    p.hook,
-    p.caption,
-    p.hashtags.join(", "),
+    now,
+    p.authorName,
+    p.authorTitle,
+    p.authorFollowers,
     p.likes,
     p.comments,
-    p.saves ?? "N/A",
+    p.reposts,
+    p.engagementScore,
     p.postType,
+    p.firstLine.slice(0, 200),
     p.url,
-    p.timestamp ? new Date(p.timestamp * 1000).toISOString() : "",
   ]);
 
-  await clearAndWrite(sheets, "Research!A1", [header, ...rows]);
-  console.log(`Wrote ${rows.length} posts to "Research" tab.`);
+  await withRetry("Append Research rows", () =>
+    sheets.spreadsheets.values.append({
+      spreadsheetId: SHEETS_ID,
+      range: "Research!A:K",
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: rows },
+    })
+  );
+
+  console.log(`  Appended ${rows.length} rows to Research tab.`);
 }
 
-async function writePlaybookToSheets(sheets, analysis) {
-  await ensureSheet(sheets, "Playbook");
+// ── Claude: Analyze what's working ─────────────────────────────────────────
+async function analyzeWithClaude(posts) {
+  const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-  const rows = [
-    ["CleanStreak Instagram Content Playbook"],
-    ["Generated", new Date().toISOString()],
-    [],
-    ["=== TOP 5 HOOK FORMULAS ==="],
-  ];
+  console.log("Analyzing top posts with Claude...");
 
-  for (const h of analysis.hookFormulas || []) {
-    rows.push(["Formula", h.formula]);
-    rows.push(["Example", h.example]);
-    rows.push(["Why It Works", h.whyItWorks]);
-    rows.push([]);
+  const postSummaries = posts.slice(0, 20).map((p, i) =>
+    `#${i + 1} [score ${p.engagementScore}] @${p.authorName} (${p.authorFollowers} followers)
+Type: ${p.postType}
+First line: "${p.firstLine}"
+Full text (first 400 chars): ${p.text.slice(0, 400)}
+Likes: ${p.likes} | Comments: ${p.comments} | Reposts: ${p.reposts}
+---`
+  ).join("\n");
+
+  const message = await withRetry("Claude research analysis", () =>
+    anthropic.messages.create({
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: `You are a LinkedIn content strategist analyzing high-performing posts about ultra-processed food, nutrition labels, and clean eating for a health app (CleanStreak — a UPF barcode scanner with streak tracking).
+
+TARGET AUDIENCE ON LINKEDIN: Health-conscious professionals aged 28-50, corporate wellness advocates, nutritionists, dietitians, fitness coaches, and educated parents. They engage with evidence-based content, data-backed claims, and actionable professional advice. LinkedIn tone is more authoritative than Instagram but still conversational.
+
+Here are the top ${posts.slice(0, 20).length} performing LinkedIn posts in this niche:
+
+${postSummaries}
+
+Analyze what is winning and return ONLY valid JSON (no markdown fences):
+
+{
+  "topInsights": [
+    "Insight about what hook formats or content structures get the most engagement on LinkedIn"
+  ],
+  "winningHookFormulas": [
+    "Hook formula with example — describe the pattern"
+  ],
+  "contentPatterns": [
+    "Structural pattern that appears in top posts"
+  ],
+  "audiencePainPoints": [
+    "Pain point or fear that top posts are tapping into on LinkedIn"
+  ],
+  "toneObservations": "1-2 sentences about the writing tone that performs well",
+  "linkedInSpecificNotes": "Observations specific to LinkedIn format — document posts vs text, length, line breaks, hashtags, etc.",
+  "recommendedTopics": [
+    "Topic idea for CleanStreak LinkedIn content based on what's performing, with suggested format if obvious"
+  ],
+  "postCount": ${posts.slice(0, 20).length}
+}`,
+        },
+      ],
+    })
+  );
+
+  const text = message.content[0].text;
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error("Claude returned non-JSON response");
   }
-
-  rows.push(["=== TOP 3 CAROUSEL STRUCTURES ==="]);
-  for (const c of analysis.carouselStructures || []) {
-    rows.push(["Structure", c.structure]);
-    rows.push(["Slide Breakdown", c.slideBreakdown]);
-    rows.push(["Example", c.example]);
-    rows.push([]);
-  }
-
-  rows.push(["=== RECURRING CTAs ==="]);
-  for (const cta of analysis.recurringCTAs || []) {
-    rows.push(["CTA", cta.cta]);
-    rows.push(["Frequency", cta.frequency]);
-    rows.push(["Context", cta.context]);
-    rows.push([]);
-  }
-
-  rows.push(["=== EMOTIONAL TRIGGERS ==="]);
-  for (const t of analysis.emotionalTriggers || []) {
-    rows.push(["Trigger", t.trigger]);
-    rows.push(["How Used", t.howUsed]);
-    rows.push(["Effectiveness", t.effectiveness]);
-    rows.push([]);
-  }
-
-  rows.push(["=== CONTENT GAPS & OPPORTUNITIES ==="]);
-  for (const g of analysis.contentGaps || []) {
-    rows.push(["Gap", g.gap]);
-    rows.push(["Opportunity", g.opportunity]);
-    rows.push(["Suggested Angle", g.suggestedAngle]);
-    rows.push([]);
-  }
-
-  rows.push([]);
-  rows.push(["=== SUMMARY ==="]);
-  rows.push([analysis.summary || ""]);
-
-  await clearAndWrite(sheets, "Playbook!A1", rows);
-  console.log('Wrote analysis to "Playbook" tab.');
 }
 
-// ── Local save ──────────────────────────────────────────────────────────────
-function saveLocally(posts, analysis) {
-  mkdirSync("research", { recursive: true });
-
+// ── Save research locally ────────────────────────────────────────────────────
+function saveResearchLocally(posts, analysis) {
+  mkdirSync("./research", { recursive: true });
   const output = {
-    generatedAt: new Date().toISOString(),
-    postCount: posts.length,
+    scrapedAt:  new Date().toISOString(),
+    platform:   "linkedin",
+    postCount:  posts.length,
     posts,
     analysis,
   };
-
-  writeFileSync("research/latest.json", JSON.stringify(output, null, 2));
-  console.log("Saved to research/latest.json");
+  writeFileSync("./research/latest.json", JSON.stringify(output, null, 2));
+  console.log("  Saved to ./research/latest.json");
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log("=== CleanStreak Instagram Research Agent ===\n");
+  console.log("=== CleanStreak LinkedIn Research ===\n");
+  requireEnv("APIFY_TOKEN", "research");
+  requireEnv("ANTHROPIC_API_KEY", "research");
 
-  // 1. Scrape posts
-  const posts = await scrapeInstagramPosts();
+  // 1. Scrape LinkedIn posts
+  const raw = await scrapeLinkedInPosts();
+  const posts = filterEngaged(raw);
 
   // 2. Analyze with Claude
   const analysis = await analyzeWithClaude(posts);
+  console.log("\nTop insights:");
+  analysis.topInsights?.forEach((i, n) => console.log(`  ${n + 1}. ${i}`));
 
-  // 3. Write to Google Sheets
+  // 3. Save locally
+  saveResearchLocally(posts, analysis);
+
+  // 4. Append to Google Sheets
+  let sheets;
   try {
-    const sheets = await getGoogleSheetsClient();
-    await writeResearchToSheets(sheets, posts);
-    await writePlaybookToSheets(sheets, analysis);
+    sheets = await getSheetsClient();
+    await appendToResearchTab(sheets, posts);
   } catch (err) {
-    console.error("Google Sheets write failed:", err.message);
-    console.log("Continuing with local save...");
+    console.error("Google Sheets unavailable:", err.message);
+    console.log("Research saved locally only.");
   }
 
-  // 4. Save locally
-  saveLocally(posts, analysis);
-
-  console.log("\nDone! Check your Google Sheet and research/latest.json");
+  console.log("\nResearch complete.");
 }
 
 main().catch((err) => {
-  console.error("Fatal error:", err);
+  console.error("Fatal:", err);
   process.exit(1);
 });

@@ -2,6 +2,7 @@ import "dotenv/config";
 import Anthropic from "@anthropic-ai/sdk";
 import { google } from "googleapis";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { requireEnv, withRetry } from "./lib/retry.js";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -24,10 +25,12 @@ async function getGoogleSheetsClient() {
 
 async function readSheetTab(sheets, range) {
   try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEETS_ID,
-      range,
-    });
+    const res = await withRetry(`Read ${range}`, () =>
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SHEETS_ID,
+        range,
+      })
+    );
     return res.data.values || [];
   } catch {
     return [];
@@ -35,29 +38,37 @@ async function readSheetTab(sheets, range) {
 }
 
 async function ensureSheet(sheets, title) {
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEETS_ID });
+  const meta = await withRetry(`Sheets metadata for ${title}`, () =>
+    sheets.spreadsheets.get({ spreadsheetId: SHEETS_ID })
+  );
   const exists = meta.data.sheets.some((s) => s.properties.title === title);
   if (!exists) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SHEETS_ID,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title } } }],
-      },
-    });
+    await withRetry(`Create ${title} sheet`, () =>
+      sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEETS_ID,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title } } }],
+        },
+      })
+    );
   }
 }
 
 async function clearAndWrite(sheets, range, values) {
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId: SHEETS_ID,
-    range,
-  });
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SHEETS_ID,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values },
-  });
+  await withRetry(`Clear ${range}`, () =>
+    sheets.spreadsheets.values.clear({
+      spreadsheetId: SHEETS_ID,
+      range,
+    })
+  );
+  await withRetry(`Write ${range}`, () =>
+    sheets.spreadsheets.values.update({
+      spreadsheetId: SHEETS_ID,
+      range,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values },
+    })
+  );
 }
 
 // ── Step 1: Load and join data ──────────────────────────────────────────────
@@ -76,8 +87,12 @@ function rowsToObjects(rows) {
 async function loadAllData(sheets) {
   console.log("Loading data from Google Sheets...");
 
-  const postsRaw = await readSheetTab(sheets, "Posts!A1:F500");
-  const metricsRaw = await readSheetTab(sheets, "Metrics!A1:N500");
+  // Posts tab supports both the old six-column shape and the new multi-format shape.
+  const postsRaw = await readSheetTab(sheets, "Posts!A1:K500");
+  // Metrics tab: Fetched At, Post URL, Post URN, Topic, Hook,
+  //              Impressions, Unique Impressions, Clicks,
+  //              Likes, Comments, Reposts, Engagement Rate
+  const metricsRaw = await readSheetTab(sheets, "Metrics!A1:M500");
 
   const posts = rowsToObjects(postsRaw);
   const metrics = rowsToObjects(metricsRaw);
@@ -85,30 +100,32 @@ async function loadAllData(sheets) {
   console.log(`  Posts tab: ${posts.length} rows`);
   console.log(`  Metrics tab: ${metrics.length} rows`);
 
-  // Join: for each post, attach its most recent metrics row
+  // Join map: Metrics keyed by post_url (most recent tracking date wins)
   const metricsMap = new Map();
   for (const m of metrics) {
-    const url = m.post_url || "";
-    if (!url) continue;
-    const existing = metricsMap.get(url);
-    // Keep the most recent tracking date
-    if (!existing || (m.date_tracked || "") > (existing.date_tracked || "")) {
-      metricsMap.set(url, m);
+    const url = (m.post_url || "").trim();
+    if (url) {
+      const existing = metricsMap.get(url);
+      if (!existing || (m.fetched_at || "") > (existing.fetched_at || "")) {
+        metricsMap.set(url, m);
+      }
     }
   }
 
   const joined = posts
-    .filter((p) => p.post_url && p.status === "posted")
+    .filter((p) => p.status === "posted")
     .map((p) => {
-      const m = metricsMap.get(p.post_url) || {};
+      const url = (p.post_url || "").trim();
+      const m = (url && metricsMap.get(url)) || {};
       return { ...p, ...m };
     });
 
   console.log(`  Joined (posted with metrics): ${joined.length} rows`);
 
-  // Also include metrics rows that might not have a Posts match
+  // Also include metrics rows that have no matching Posts entry
+  const joinedUrls = new Set(joined.map((j) => j.post_url).filter(Boolean));
   for (const [url, m] of metricsMap) {
-    if (!joined.some((j) => j.post_url === url)) {
+    if (!joinedUrls.has(url)) {
       joined.push(m);
     }
   }
@@ -124,9 +141,8 @@ function num(val) {
 
 function scorePost(post) {
   return (
-    num(post.saves || post.saved) * 3 +
-    num(post.shares) * 2 +
-    num(post.profile_visits) * 2 +
+    num(post.reposts) * 5 +
+    num(post.comments) * 3 +
     num(post.likes)
   );
 }
@@ -148,7 +164,7 @@ function analyzePerformance(joined) {
   const patterns = {
     topicScores: {},
     hookTypeScores: {},
-    mediaTypeScores: {},
+    formatScores: {},
   };
 
   for (const p of scored) {
@@ -170,19 +186,24 @@ function analyzePerformance(joined) {
     patterns.hookTypeScores[hookType].totalScore += p.score;
     patterns.hookTypeScores[hookType].count += 1;
 
-    // Media type
-    const mediaType = p.media_type || "unknown";
-    if (!patterns.mediaTypeScores[mediaType]) {
-      patterns.mediaTypeScores[mediaType] = { totalScore: 0, count: 0 };
+    const contentType = p.content_type || "carousel";
+    if (!patterns.formatScores[contentType]) {
+      patterns.formatScores[contentType] = { totalScore: 0, count: 0, impressions: 0, clicks: 0 };
     }
-    patterns.mediaTypeScores[mediaType].totalScore += p.score;
-    patterns.mediaTypeScores[mediaType].count += 1;
+    patterns.formatScores[contentType].totalScore += p.score;
+    patterns.formatScores[contentType].count += 1;
+    patterns.formatScores[contentType].impressions += num(p.impressions);
+    patterns.formatScores[contentType].clicks += num(p.clicks);
   }
 
   // Compute averages
-  for (const group of [patterns.topicScores, patterns.hookTypeScores, patterns.mediaTypeScores]) {
+  for (const group of [patterns.topicScores, patterns.hookTypeScores, patterns.formatScores]) {
     for (const key of Object.keys(group)) {
       group[key].avgScore = Math.round(group[key].totalScore / group[key].count);
+      if (group[key].impressions !== undefined) {
+        group[key].avgImpressions = Math.round(group[key].impressions / group[key].count);
+        group[key].avgClicks = Math.round(group[key].clicks / group[key].count);
+      }
     }
   }
 
@@ -198,7 +219,6 @@ function classifyHook(hook) {
   if (/secret|hidden|nobody|most people/i.test(lower)) return "curiosity_gap";
   if (/you need|you should|you're/i.test(lower)) return "direct_address";
   if (/myth|truth|actually|reality/i.test(lower)) return "myth_buster";
-  if (/save this|bookmark/i.test(lower)) return "save_bait";
   if (hook.length > 0) return "statement";
   return "unknown";
 }
@@ -209,11 +229,11 @@ function buildAnalysisPrompt(analysis) {
 
   const formatPost = (p) =>
     `  - URL: ${p.post_url || "n/a"}
-    Topic: ${p.topic || "n/a"} | Hook: "${p.hook || "n/a"}"
-    Score: ${p.score} | Impressions: ${p.impressions || 0} | Reach: ${p.reach || 0}
-    Likes: ${p.likes || 0} | Saves: ${p.saves || p.saved || 0} | Shares: ${p.shares || 0}
-    Profile Visits: ${p.profile_visits || 0} | Follows: ${p.follows || 0}
-    Media Type: ${p.media_type || "n/a"} | Date: ${p.date_posted || "n/a"}`;
+    Type: ${p.content_type || "carousel"} | Topic: ${p.topic || "n/a"} | Hook: "${p.hook || "n/a"}"
+    Score: ${p.score} | Impressions: ${p.impressions || 0} | Unique Impressions: ${p.unique_impressions || 0}
+    Likes: ${p.likes || 0} | Comments: ${p.comments || 0} | Reposts: ${p.reposts || 0}
+    Clicks: ${p.clicks || 0} | Engagement Rate: ${p.engagement_rate || 0}
+    Date: ${p.date || p.fetched_at || "n/a"}`;
 
   const topicRanking = Object.entries(patterns.topicScores)
     .sort(([, a], [, b]) => b.avgScore - a.avgScore)
@@ -225,16 +245,16 @@ function buildAnalysisPrompt(analysis) {
     .map(([type, d]) => `  ${type}: avg ${d.avgScore} (${d.count} posts)`)
     .join("\n");
 
-  const mediaRanking = Object.entries(patterns.mediaTypeScores)
+  const formatRanking = Object.entries(patterns.formatScores)
     .sort(([, a], [, b]) => b.avgScore - a.avgScore)
-    .map(([type, d]) => `  ${type}: avg ${d.avgScore} (${d.count} posts)`)
+    .map(([type, d]) => `  ${type}: avg score ${d.avgScore}, avg impressions ${d.avgImpressions}, avg clicks ${d.avgClicks} (${d.count} posts)`)
     .join("\n");
 
-  return `Based on this performance data, update our content playbook. Identify: the 3 hook formulas that drive the most saves, the optimal slide count, which topics resonate most, what to stop doing, and 5 specific carousel ideas to create next based on gaps and winners.
+  return `Based on this LinkedIn performance data, update our content playbook for three content formats: carousel documents, text-only posts, and single-image posts. Identify the formats, hook formulas, topics, and content structures that drive the most reposts and comments. Still evaluate carousel slide count, but only inside carousel-specific recommendations.
 
 PERFORMANCE DATA (${totalPosts} total posts analyzed):
 
-TOP 5 POSTS (by weighted score: saves*3 + shares*2 + profile_visits*2 + likes):
+TOP 5 POSTS (by weighted score: reposts*5 + comments*3 + likes):
 ${top5.map(formatPost).join("\n\n")}
 
 BOTTOM 5 POSTS:
@@ -246,28 +266,38 @@ ${topicRanking}
 HOOK TYPE PERFORMANCE (avg score):
 ${hookRanking}
 
-MEDIA TYPE PERFORMANCE (avg score):
-${mediaRanking}
+CONTENT FORMAT PERFORMANCE:
+${formatRanking}
 
-SCORING FORMULA: score = (saves × 3) + (shares × 2) + (profile_visits × 2) + likes
-Higher saves/shares are weighted more because they signal deeper intent and algorithmic reach.
+SCORING FORMULA: score = (reposts × 5) + (comments × 3) + likes
+Reposts are weighted highest because they signal algorithmic amplification and peer endorsement.
+Comments are weighted heavily because they drive professional conversation and LinkedIn's algorithm.
+Likes are counted but weighted least as they represent passive engagement.
+
+PLATFORM CONTEXT: This is LinkedIn content targeting a B2B audience. Formats include carousel documents, text-only posts, and single-image posts. Audience consists of professionals, founders, and operators. Tone should be authoritative, data-driven, and actionable. CTAs drive app downloads, comments, saves, or newsletter signups.
 
 Please respond with a JSON object in this exact structure:
 {
   "generated_date": "YYYY-MM-DD",
   "total_posts_analyzed": <number>,
-  "top_hook_formulas": [
-    { "formula": "...", "why_it_works": "...", "example": "...", "avg_saves": <number> }
+  "format_performance": [
+    { "content_type": "carousel|post|image", "avg_score": <number>, "avg_impressions": <number>, "recommendation": "..." }
   ],
-  "optimal_slide_count": { "recommended": <number>, "reasoning": "..." },
+  "top_hook_formulas": [
+    { "formula": "...", "why_it_works": "...", "example": "...", "avg_reposts": <number> }
+  ],
+  "carousel_recommendations": {
+    "optimal_slide_count": { "recommended": <number>, "reasoning": "..." },
+    "when_to_use": "..."
+  },
   "top_topics": [
     { "topic": "...", "avg_score": <number>, "recommendation": "..." }
   ],
   "stop_doing": [
     { "pattern": "...", "reason": "...", "evidence": "..." }
   ],
-  "next_carousel_ideas": [
-    { "topic": "...", "hook": "...", "angle": "...", "why": "...", "slide_count": <number> }
+  "next_content_ideas": [
+    { "content_type": "carousel|post|image", "topic": "...", "hook": "...", "angle": "...", "why": "...", "asset_count": <number> }
   ],
   "strategic_insights": [
     "..."
@@ -285,16 +315,18 @@ async function getClaudePlaybook(analysis) {
 
   const prompt = buildAnalysisPrompt(analysis);
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
-    messages: [
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-  });
+  const response = await withRetry("Claude playbook generation", () =>
+    anthropic.messages.create({
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    })
+  );
 
   const text = response.content[0].text.trim();
 
@@ -315,15 +347,26 @@ function playbookToSheetRows(playbook) {
   rows.push(["Posts Analyzed", String(playbook.total_posts_analyzed || 0)]);
   rows.push(["", ""]);
 
+  rows.push(["── FORMAT PERFORMANCE ──", ""]);
+  for (const f of playbook.format_performance || []) {
+    rows.push([
+      f.content_type || "unknown",
+      `Avg score: ${f.avg_score} | Avg impressions: ${f.avg_impressions} | ${f.recommendation}`,
+    ]);
+  }
+  rows.push(["", ""]);
+
   rows.push(["── TOP HOOK FORMULAS ──", ""]);
   for (const h of playbook.top_hook_formulas || []) {
     rows.push([`Hook: ${h.formula}`, `Why: ${h.why_it_works} | Example: "${h.example}"`]);
   }
   rows.push(["", ""]);
 
-  rows.push(["── OPTIMAL SLIDE COUNT ──", ""]);
-  const sc = playbook.optimal_slide_count || {};
+  rows.push(["── CAROUSEL RECOMMENDATIONS ──", ""]);
+  const carousel = playbook.carousel_recommendations || {};
+  const sc = carousel.optimal_slide_count || playbook.optimal_slide_count || {};
   rows.push([`Recommended: ${sc.recommended || "N/A"} slides`, sc.reasoning || ""]);
+  if (carousel.when_to_use) rows.push(["When to use", carousel.when_to_use]);
   rows.push(["", ""]);
 
   rows.push(["── TOP TOPICS ──", ""]);
@@ -338,11 +381,12 @@ function playbookToSheetRows(playbook) {
   }
   rows.push(["", ""]);
 
-  rows.push(["── NEXT CAROUSEL IDEAS ──", ""]);
-  for (const idea of playbook.next_carousel_ideas || []) {
+  rows.push(["── NEXT CONTENT IDEAS ──", ""]);
+  const nextIdeas = playbook.next_content_ideas || playbook.next_carousel_ideas || [];
+  for (const idea of nextIdeas) {
     rows.push([
-      `${idea.topic}: "${idea.hook}"`,
-      `Angle: ${idea.angle} | Why: ${idea.why} | Slides: ${idea.slide_count}`,
+      `${idea.content_type || "carousel"} | ${idea.topic}: "${idea.hook}"`,
+      `Angle: ${idea.angle} | Why: ${idea.why} | Assets: ${idea.asset_count || idea.slide_count || "n/a"}`,
     ]);
   }
   rows.push(["", ""]);
@@ -394,7 +438,7 @@ function printReport(analysis, playbook) {
       `  Score ${String(p.score).padStart(5)} | ${(p.topic || "?").padEnd(20)} | "${hook}"`
     );
     console.log(
-      `           Saves: ${p.saves || p.saved || 0} | Shares: ${p.shares || 0} | Likes: ${p.likes || 0}`
+      `           Reposts: ${p.reposts || 0} | Comments: ${p.comments || 0} | Likes: ${p.likes || 0}`
     );
   }
 
@@ -420,15 +464,27 @@ function printReport(analysis, playbook) {
     console.log(`  ${type.padEnd(20)} avg: ${String(data.avgScore).padStart(5)} (${data.count} posts)`);
   }
 
+  console.log("\n── FORMAT RANKING ─────────────────────────────────────");
+  const formatsSorted = Object.entries(patterns.formatScores)
+    .sort(([, a], [, b]) => b.avgScore - a.avgScore);
+  for (const [type, data] of formatsSorted) {
+    console.log(
+      `  ${type.padEnd(12)} avg score: ${String(data.avgScore).padStart(5)} | avg impressions: ${String(data.avgImpressions).padStart(5)} (${data.count} posts)`
+    );
+  }
+
   console.log("\n── KEY STRATEGIC INSIGHTS ─────────────────────────────");
   for (const insight of playbook.strategic_insights || []) {
     console.log(`  • ${insight}`);
   }
 
-  console.log("\n── NEXT 5 CAROUSEL IDEAS ──────────────────────────────");
-  for (const idea of playbook.next_carousel_ideas || []) {
+  console.log("\n── NEXT CONTENT IDEAS ─────────────────────────────────");
+  const nextIdeas = playbook.next_content_ideas || playbook.next_carousel_ideas || [];
+  for (const idea of nextIdeas) {
     console.log(`  → "${idea.hook}"`);
-    console.log(`    Topic: ${idea.topic} | ${idea.slide_count} slides | ${idea.angle}`);
+    console.log(
+      `    Type: ${idea.content_type || "carousel"} | Topic: ${idea.topic} | Assets: ${idea.asset_count || idea.slide_count || "n/a"} | ${idea.angle}`
+    );
   }
 
   console.log("\n── CONTENT RULES ─────────────────────────────────────");
@@ -438,18 +494,16 @@ function printReport(analysis, playbook) {
 
   console.log("\n" + "═".repeat(60));
   console.log("  Playbook saved to: Sheets 'Playbook' tab + ./research/playbook.json");
-  console.log("  generate.js will auto-read this playbook for future carousels.");
+  console.log("  generate.js will auto-read this playbook for future content.");
   console.log("═".repeat(60) + "\n");
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log("=== CleanStreak Content Iteration Engine ===\n");
+  console.log("=== CleanStreak LinkedIn Content Iteration Engine ===\n");
 
-  if (!ANTHROPIC_API_KEY) {
-    console.error("Missing ANTHROPIC_API_KEY env var.");
-    process.exit(1);
-  }
+  requireEnv("ANTHROPIC_API_KEY", "iteration");
+  requireEnv("SHEETS_ID", "iteration");
 
   // 1. Load data
   const sheets = await getGoogleSheetsClient();

@@ -1,0 +1,654 @@
+<!--
+  CLEANSTREAK LANDING PAGE — FULL COPY REWRITE
+  =============================================
+  This file contains ONLY the body content with copy changes.
+  Existing classes are preserved exactly. Only text nodes change.
+  
+  COLOR GUIDE:
+  • text-white          = primary white (headlines)
+  • text-white/65       = dimmed white (used for second half of split headlines)
+  • text-brand-accent   = green (#46FC94) (used for emphasis words mid-line)
+  • text-brand-muted    = gray body copy
+  
+  SPLIT HEADLINE PATTERN (existing pattern in your codebase):
+  <h2>First part of headline <span class="text-white/65">dimmed second part.</span></h2>
+  
+  For GREEN mid-line emphasis:
+  <h2>You're eating <span class="text-brand-accent">more UPF than you think.</span></h2>
+-->
+
+
+<!-- ============================================================
+     NAV — no copy changes needed
+     ============================================================ -->
+
+
+<!-- ============================================================
+     HERO SECTION
+     ============================================================ -->
+<header class="relative overflow-hidden px-6 pb-20 pt-14 md:pb-28 md:pt-20">
+  <div class="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.02fr_0.98fr]">
+    <div class="relative z-10">
+
+      <!-- Badge — keep existing markup, change text only -->
+      <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-accent/20 bg-brand-panel px-4 py-2 text-xs font-extrabold uppercase tracking-[0.24em] text-brand-accent accent-ring">
+        <span class="h-2 w-2 rounded-full bg-brand-accent"></span>
+        Scan. Know. Streak.
+        <!-- CHANGED FROM: "Built around the CleanStreak app" -->
+        <!-- WHY: Action-led. States the product loop in 3 words. -->
+      </div>
+
+      <!-- H1 — SPLIT HEADLINE -->
+      <h1 class="text-balance max-w-3xl text-5xl font-extrabold leading-[0.98] tracking-[-0.05em] text-white md:text-7xl">
+        You're eating more UPF
+        <span class="text-brand-accent">than you think.</span>
+      </h1>
+      <!--
+        CHANGED FROM: "Build a clean streak that feels sustainable."
+        
+        STYLING NOTES:
+        Line 1 "You're eating more UPF" → text-white (default)
+        Line 2 "than you think." → text-brand-accent (green)
+        
+        WHY: Names the problem immediately. Creates cognitive dissonance.
+        The research showed this is the #1 hook pattern in the niche.
+        "Feels sustainable" is weak. This puts the user on defense
+        and makes them want to know more.
+      -->
+
+      <!-- Subheadline -->
+      <p class="mt-6 max-w-2xl text-lg leading-8 text-brand-muted md:text-xl">
+        Scan any product. Get an instant verdict. Build a streak that actually sticks — no label-reading, no Googling ingredients, no guessing.
+      </p>
+      <!--
+        CHANGED FROM: "CleanStreak helps you scan ingredients, protect your momentum,
+        and make better food decisions without turning healthy eating into more mental noise."
+        
+        WHY: Old copy is passive ("helps you"). New copy is imperative and specific.
+        "No label-reading, no Googling, no guessing" names the exact friction points
+        your audience experiences every time they pick up a product.
+      -->
+
+      <!-- Feature pills — text changes only -->
+      <div class="mt-8 flex flex-wrap gap-3 text-sm font-semibold text-white">
+        <div class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-brand-panel px-4 py-2 text-brand-muted">
+          <i class="fa-solid fa-barcode text-brand-accent"></i>
+          Instant pass or fail
+          <!-- CHANGED FROM: "Instant scan results" — "pass or fail" is clearer -->
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-brand-panel px-4 py-2 text-brand-muted">
+          <i class="fa-solid fa-bolt text-brand-accent"></i>
+          Streak that builds momentum
+          <!-- CHANGED FROM: "Streak-focused support" — more specific outcome -->
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-brand-panel px-4 py-2 text-brand-muted">
+          <i class="fa-solid fa-utensils text-brand-accent"></i>
+          Clean recipes, no effort
+          <!-- CHANGED FROM: "Practical recipes" — outcome-led -->
+        </div>
+      </div>
+
+      <!-- CTA form — small copy changes -->
+      <div class="surface-glow mt-10 max-w-2xl rounded-[2rem] border border-white/6 bg-brand-panel p-3">
+        <form data-waitlist-form="hero" class="grid gap-3 md:grid-cols-[1fr_auto]">
+          <input type="hidden" name="source" value="hero" />
+          <label class="sr-only" for="email-hero">Email address</label>
+          <input
+            type="email"
+            id="email-hero"
+            name="email"
+            placeholder="Enter your email"
+            class="min-w-0 rounded-[1.35rem] border border-white/8 bg-black/40 px-5 py-4 text-base text-white outline-none transition placeholder:text-brand-muted focus:border-brand-accent focus:ring-1 focus:ring-brand-accent"
+            required
+          />
+          <button
+            type="submit"
+            class="inline-flex items-center justify-center gap-2 rounded-[1.35rem] bg-brand-accent px-6 py-4 text-base font-extrabold text-black transition hover:scale-[1.01] hover:shadow-glow active:scale-[0.98]"
+          >
+            Claim my spot
+            <i class="fa-solid fa-arrow-right text-sm"></i>
+            <!-- CHANGED FROM: "Join the waitlist" — action-led, possessive ("my") -->
+          </button>
+        </form>
+        <div class="mt-4 flex flex-col gap-3 px-2 text-sm text-brand-muted md:flex-row md:items-center md:justify-between">
+          <p class="flex items-center gap-2">
+            <i class="fa-solid fa-lock text-brand-accent"></i>
+            First 1,000 get lifetime access — $29.99
+            <!-- CHANGED FROM: "Early adopter pricing: $29.99 lifetime"
+                 WHY: Scarcity first ("First 1,000"), then the deal. Urgency before price. -->
+          </p>
+          <p class="text-white/70">
+            No payment today. Spot reserved by email.
+            <!-- CHANGED FROM: "No charge today. Launch access is emailed later."
+                 WHY: "Spot reserved" implies scarcity. Shorter, cleaner. -->
+          </p>
+        </div>
+        <p id="success-hero" class="mt-4 hidden px-2 text-sm font-semibold text-brand-accent">
+          You're on the list! Keep an eye on your inbox.
+          <!-- NO CHANGE — success message is fine -->
+        </p>
+      </div>
+
+    </div>
+    <!-- phone mockup column — no changes -->
+  </div>
+</header>
+
+
+<!-- ============================================================
+     WHY CLEANSTREAK SECTION
+     ============================================================ -->
+<section class="px-6 pb-10">
+  <div class="surface-glow mx-auto max-w-6xl rounded-[2rem] border border-white/6 bg-brand-panel px-8 py-10 md:px-12">
+    <div class="grid gap-8 md:grid-cols-[0.9fr_1.1fr] md:items-center">
+      <div>
+        <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-brand-accent">
+          Why CleanStreak
+        </p>
+        <h2 class="mt-4 text-3xl font-extrabold tracking-[-0.04em] text-white md:text-4xl">
+          The labels are designed
+          <span class="text-white/65">to confuse you.</span>
+        </h2>
+        <!--
+          CHANGED FROM: "The goal is not perfection. It is a clearer routine."
+          
+          STYLING NOTES:
+          "The labels are designed" → text-white
+          "to confuse you." → text-white/65 (dimmed)
+          
+          WHY: The old headline is soft and vague. This one names a villain
+          (the food industry) and validates why the user has been struggling.
+          It's the "it's not your fault" emotional trigger the research identified
+          as the #2 most effective lever in this niche.
+        -->
+      </div>
+      <p class="text-lg leading-8 text-brand-muted">
+        "Natural flavors." "No added sugar." "Made with whole grains." These phrases are marketing — and food companies spend billions making sure you can't tell the difference. CleanStreak cuts through it in two seconds flat.
+      </p>
+      <!--
+        CHANGED FROM: "CleanStreak is designed for people who want practical support,
+        not more guilt. Scan products quickly, protect your streak, and keep healthier
+        options visible when your energy is low."
+        
+        WHY: Old copy is generic wellness-speak. New copy names specific deceptive
+        label phrases your audience has seen, then positions CleanStreak as the
+        direct counter-attack. "Two seconds flat" is concrete and memorable.
+      -->
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     CORE TOOLS SECTION
+     ============================================================ -->
+<section class="px-6 py-16 md:py-20">
+  <div class="mx-auto max-w-6xl">
+    <div class="mb-12 flex items-end justify-between gap-6">
+      <div>
+        <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-brand-accent">
+          Core tools
+        </p>
+        <h2 class="mt-4 text-4xl font-extrabold tracking-[-0.04em] text-white md:text-5xl">
+          Three tools.
+          <span class="text-white/65">One goal.</span>
+        </h2>
+        <!--
+          CHANGED FROM: "Built like the app: clear, fast, and calm."
+          
+          STYLING NOTES:
+          "Three tools." → text-white
+          "One goal." → text-white/65
+          
+          WHY: Clean and direct. The old headline is about the UI design
+          ("clear, fast, and calm") which nobody shopping for a health app cares about.
+        -->
+      </div>
+      <p class="hidden max-w-md text-sm leading-6 text-brand-muted lg:block">
+        Make clean eating the path of least resistance — not another thing to figure out.
+        <!-- CHANGED FROM: "Every section uses the same visual language as the app:
+             dark surfaces, rounded panels, and green only where action or progress matters."
+             WHY: The old copy describes the page design to someone not yet using the app.
+             Nobody cares. New copy restates the core value proposition. -->
+      </p>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-3">
+
+      <!-- CARD 1: Scanner -->
+      <article class="surface-glow rounded-[1rem] border border-white/6 bg-brand-panel p-8">
+        <div class="flex items-center justify-between">
+          <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-black/40 text-brand-accent">
+            <i class="fa-solid fa-barcode text-xl"></i>
+          </div>
+          <span class="rounded-full border border-brand-accent/20 bg-brand-accent/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.24em] text-brand-accent">
+            Scan
+          </span>
+        </div>
+        <h3 class="mt-6 text-2xl font-bold text-white">
+          Ingredient scanner
+        </h3>
+        <p class="mt-3 text-base leading-7 text-brand-muted">
+          Point your camera at any barcode. Get a clean pass or a fail verdict in under two seconds — no ingredient list required.
+        </p>
+        <!--
+          CHANGED FROM: "Check labels in seconds and get a direct answer
+          without digging through ingredient lists on your own."
+          WHY: "Pass or fail" is concrete. "Under two seconds" is specific.
+          "No ingredient list required" names the friction you're removing.
+        -->
+        <!-- UI demo widget — no changes -->
+        <div class="mt-8 rounded-[1.5rem] border border-white/6 bg-black/30 p-4">
+          <div class="flex items-center justify-between text-sm">
+            <span class="font-semibold text-white/70">Result</span>
+            <span class="font-bold text-brand-accent">Clean choice</span>
+          </div>
+          <div class="mt-3 h-2 rounded-full bg-white/8">
+            <div class="h-2 w-4/5 rounded-full bg-brand-accent"></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- CARD 2: Streak -->
+      <article class="surface-glow rounded-[1rem] border border-white/6 bg-brand-panelSoft p-8">
+        <div class="flex items-center justify-between">
+          <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-black/35 text-brand-accent">
+            <i class="fa-solid fa-fire-flame-curved text-xl"></i>
+          </div>
+          <span class="rounded-full border border-brand-accent/20 bg-brand-accent/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.24em] text-brand-accent">
+            streak
+          </span>
+        </div>
+        <h3 class="mt-6 text-2xl font-bold text-white">
+          Daily streak tracking
+        </h3>
+        <p class="mt-3 text-base leading-7 text-brand-muted">
+          One clean day becomes seven. Seven becomes thirty. The streak makes it feel worth protecting — and hard to quit.
+        </p>
+        <!--
+          CHANGED FROM: "Stay focused on today, watch your momentum compound,
+          and keep your next milestone in view."
+          WHY: The progression (1→7→30) is concrete and aspirational.
+          "Hard to quit" is honest and taps into the psychology of streaks
+          that the research identified as a completely unclaimed content angle.
+        -->
+        <!-- UI demo widget — no changes -->
+        <div class="mt-8 grid grid-cols-3 gap-3">
+          <div class="rounded-2xl bg-black/30 p-4 text-center">
+            <div class="text-3xl font-extrabold text-white">3</div>
+            <div class="mt-1 text-xs font-bold uppercase tracking-[0.22em] text-white/40">days</div>
+          </div>
+          <div class="rounded-2xl bg-black/30 p-4 text-center">
+            <div class="text-3xl font-extrabold text-white">7</div>
+            <div class="mt-1 text-xs font-bold uppercase tracking-[0.22em] text-white/40">days</div>
+          </div>
+          <div class="rounded-2xl bg-black/30 p-4 text-center">
+            <div class="text-3xl font-extrabold text-brand-accent">14</div>
+            <div class="mt-1 text-xs font-bold uppercase tracking-[0.22em] text-white/40">days</div>
+          </div>
+        </div>
+      </article>
+
+      <!-- CARD 3: SOS -->
+      <article class="surface-glow rounded-[1rem] border border-white/6 bg-brand-panel p-8">
+        <div class="flex items-center justify-between">
+          <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-black/40 text-brand-accent">
+            <i class="fa-solid fa-bell text-xl"></i>
+          </div>
+          <span class="rounded-full border border-brand-accent/20 bg-brand-accent/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.24em] text-brand-accent">
+            support
+          </span>
+        </div>
+        <h3 class="mt-6 text-2xl font-bold text-white">
+          SOS interruption tools
+        </h3>
+        <p class="mt-3 text-base leading-7 text-brand-muted">
+          Cravings don't break streaks. Giving up on the day does. SOS tools give you a 60-second reset so one bad moment stays exactly that — one moment.
+        </p>
+        <!--
+          CHANGED FROM: "Use fast resets when cravings hit so a rough moment
+          does not turn into a lost day."
+          WHY: "Cravings don't break streaks. Giving up on the day does." is a
+          reframe that removes blame from the user while teaching them something true.
+          This is the shame-removal emotional trigger the research flagged as highly effective.
+        -->
+        <!-- UI pills — text changes -->
+        <div class="mt-8 space-y-3">
+          <div class="rounded-[1.35rem] border border-white/6 bg-black/30 px-4 py-3 text-sm text-white/75">
+            60-second reset prompts
+          </div>
+          <div class="rounded-[1.35rem] border border-white/6 bg-black/30 px-4 py-3 text-sm text-white/75">
+            Pattern interrupt ideas
+          </div>
+          <div class="rounded-[1.35rem] border border-brand-accent/20 bg-brand-accent/10 px-4 py-3 text-sm font-semibold text-brand-accent">
+            Built to protect your streak, not shame you
+            <!-- CHANGED FROM: "Designed to protect your streak, not shame you"
+                 Minor: "Built" is more active than "Designed" -->
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     PRO FEATURES SECTION
+     ============================================================ -->
+<section class="px-6 py-16 md:py-20">
+  <div class="mx-auto max-w-6xl rounded-[2.5rem]">
+    <div class="mb-10 max-w-3xl">
+      <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-brand-accent">
+        Pro features
+      </p>
+      <h2 class="mt-4 text-4xl font-extrabold tracking-[-0.04em] text-white md:text-5xl">
+        For the moments
+        <span class="text-white/65">when willpower runs out.</span>
+      </h2>
+      <!--
+        CHANGED FROM: "More support when you want less decision fatigue."
+        
+        STYLING NOTES:
+        "For the moments" → text-white
+        "when willpower runs out." → text-white/65
+        
+        WHY: "Decision fatigue" is jargon. "When willpower runs out" is something
+        every person has felt and immediately understands. It's honest and disarming.
+      -->
+      <p class="mt-4 max-w-2xl text-lg leading-8 text-brand-muted">
+        Tired, rushed, or craving something you shouldn't — Pro tools make the clean choice easier to reach than the processed one.
+        <!-- CHANGED FROM: "Premium tools are built to make good choices easier
+             on tired, rushed, or high-craving days."
+             WHY: More specific. "Easier to reach than the processed one" names
+             the direct competition (processed food) instead of being abstract. -->
+      </p>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+
+      <!-- Pro Card 1: Recipe vault -->
+      <article class="rounded-[1.5rem] border border-white/6 bg-brand-panel p-7">
+        <!-- badge + icon — no changes -->
+        <div class="flex items-center justify-between">
+          <span class="rounded-full bg-brand-accent px-3 py-1 text-xs font-extrabold uppercase tracking-[0.24em] text-black">Pro</span>
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-black/35 text-brand-accent">
+            <i class="fa-solid fa-utensils text-lg"></i>
+          </div>
+        </div>
+        <h3 class="mt-6 text-2xl font-bold text-white">Recipe vault</h3>
+        <p class="mt-3 text-base leading-7 text-brand-muted">
+          Clean meals you'll actually make. Filtered for UPF-free ingredients, sorted by how little effort they take.
+          <!-- CHANGED FROM: "Find low-friction meals that look good, feel simple,
+               and fit the app's clean-eating approach."
+               WHY: "You'll actually make" is honest and relatable. "How little effort
+               they take" names the real filter. "Fit the app's clean-eating approach"
+               is circular — of course it fits the app, it's in the app. -->
+        </p>
+        <!-- recipe card widget — no changes -->
+        <div class="mt-7 overflow-hidden rounded-[1rem] border border-white/6 bg-brand-panelSoft">
+          <div class="h-40 bg-[radial-gradient(circle_at_top_right,rgba(70,252,148,0.28),transparent_35%),linear-gradient(135deg,#2A2A2A_0%,#1B1B1B_42%,#101010_100%)]"></div>
+          <div class="p-5">
+            <div class="flex items-center justify-between">
+              <span class="rounded-full bg-brand-accent/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.2em] text-brand-accent">One pot</span>
+              <span class="text-sm font-semibold text-white/55">25 min</span>
+            </div>
+            <p class="mt-4 text-xl font-bold text-white">Simple dinners for busy nights</p>
+            <p class="mt-2 text-sm leading-6 text-brand-muted">Fast recipes that keep cleaner options easy to reach.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- Pro Card 2: Ingredient context -->
+      <article class="rounded-[1.5rem] border border-white/6 bg-brand-panel p-7">
+        <div class="flex items-center justify-between">
+          <span class="rounded-full bg-brand-accent px-3 py-1 text-xs font-extrabold uppercase tracking-[0.24em] text-black">Pro</span>
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-black/35 text-brand-accent">
+            <i class="fa-solid fa-magnifying-glass-chart text-lg"></i>
+          </div>
+        </div>
+        <h3 class="mt-6 text-2xl font-bold text-white">Ingredient context</h3>
+        <p class="mt-3 text-base leading-7 text-brand-muted">
+          Scan flagged an ingredient. Now find out exactly why — what it is, where it comes from, and whether it's worth avoiding.
+          <!-- CHANGED FROM: "Go beyond a label scan and get a clearer explanation
+               of what is in a product and why it may matter."
+               WHY: "Why it may matter" is weak hedge language. The rewrite is
+               direct and answers the obvious follow-up question a user has after
+               getting a flag. -->
+        </p>
+        <!-- ingredient widget — no changes -->
+        <div class="mt-7 rounded-[1rem] border border-white/6 bg-brand-panelSoft p-5">
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-white/70">Artificial flavors</span>
+              <span class="text-sm font-bold text-brand-accent">Flagged</span>
+            </div>
+            <div class="h-px bg-white/6"></div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-white/70">Added sweeteners</span>
+              <span class="text-sm font-bold text-brand-accent">Review</span>
+            </div>
+            <div class="h-px bg-white/6"></div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-white/70">Overall read</span>
+              <span class="text-sm font-bold text-white">Keep it occasional</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     ROADMAP SECTION
+     ============================================================ -->
+<section id="roadmap" class="px-6 py-16 md:py-20">
+  <div class="mx-auto max-w-6xl">
+    <div class="mb-10 max-w-3xl">
+      <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-brand-accent">
+        Roadmap
+      </p>
+      <h2 class="mt-4 text-4xl font-extrabold tracking-[-0.04em] text-white md:text-5xl">
+        Coming next:
+        <span class="text-white/65">tools that make it harder to fail.</span>
+      </h2>
+      <!--
+        CHANGED FROM: "Next up: deeper support inside the streak."
+        
+        STYLING NOTES:
+        "Coming next:" → text-white
+        "tools that make it harder to fail." → text-white/65
+        
+        WHY: "Harder to fail" is a provocative and memorable promise.
+        It reframes the product from aspirational ("make better choices")
+        to defensive ("prevent the bad outcome") — which is more honest
+        and more emotionally resonant for someone who has failed at
+        healthy eating before.
+      -->
+      <p class="mt-4 text-lg leading-8 text-brand-muted">
+        Every feature on the roadmap has the same job: make the next clean day easier than the last one.
+        <!-- CHANGED FROM: "Planned additions stay focused on the same goal:
+             making cleaner choices easier to repeat."
+             WHY: "Next clean day easier than the last one" is concrete and
+             progressive. It implies momentum, which mirrors the streak mechanic. -->
+      </p>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+
+      <!-- Roadmap card 1: AI recipe builder -->
+      <article class="surface-glow rounded-[1.5rem] border border-white/6 bg-brand-panel p-8">
+        <div class="flex items-center justify-between gap-4">
+          <span class="rounded-full border border-brand-accent/20 bg-brand-accent/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.24em] text-brand-accent">
+            Coming soon
+          </span>
+          <i class="fa-solid fa-wand-magic-sparkles text-brand-accent"></i>
+        </div>
+        <h3 class="mt-6 text-3xl font-bold text-white">AI recipe builder</h3>
+        <p class="mt-4 text-base leading-7 text-brand-muted">
+          Tell it what's in your fridge. Get a clean meal idea in seconds — no grocery run, no planning, no excuses.
+          <!-- CHANGED FROM: "Start with what you have on hand and get a clean,
+               practical meal idea that fits the moment."
+               WHY: "No excuses" is playfully direct and memorable. The three
+               "no" items name the exact friction points between intention and action. -->
+        </p>
+        <a href="#waitlist" class="mt-8 inline-flex items-center gap-2 rounded-xl bg-brand-accent px-5 py-3 text-sm font-extrabold text-black transition hover:scale-[1.01] hover:shadow-glow active:scale-[0.98]">
+          Get launch access
+          <i class="fa-solid fa-arrow-right text-xs"></i>
+        </a>
+      </article>
+
+      <!-- Roadmap card 2: Craving coach -->
+      <article class="surface-glow rounded-[1.5rem] border border-white/6 bg-brand-panel p-8">
+        <div class="flex items-center justify-between gap-4">
+          <span class="rounded-full border border-brand-accent/20 bg-brand-accent/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.24em] text-brand-accent">
+            Coming soon
+          </span>
+          <i class="fa-solid fa-comments text-brand-accent"></i>
+        </div>
+        <h3 class="mt-6 text-3xl font-bold text-white">Craving coach</h3>
+        <p class="mt-4 text-base leading-7 text-brand-muted">
+          Real-time help for the moment the streak feels fragile. Not a lecture — a fast, practical nudge to get you through the next ten minutes.
+          <!-- CHANGED FROM: "Get fast, in-the-moment guidance when you need help
+               staying with the habit you are building."
+               WHY: "When the streak feels fragile" is emotional and specific.
+               "Not a lecture" preemptively removes the fear of being shamed.
+               "Next ten minutes" makes the goal feel achievable. -->
+        </p>
+        <a href="#waitlist" class="mt-8 inline-flex items-center gap-2 rounded-xl border border-white/8 bg-white/4 px-5 py-3 text-sm font-bold text-white transition hover:border-brand-accent/35 hover:text-brand-accent">
+          Join the waitlist
+          <i class="fa-solid fa-arrow-right text-xs"></i>
+        </a>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     EARLY ADOPTER / PRICING SECTION
+     ============================================================ -->
+<section id="waitlist" class="px-6 py-16 pb-24 md:py-20 md:pb-28">
+  <div class="accent-ring surface-glow mx-auto max-w-4xl rounded-[1.5rem] border border-brand-accent/20 bg-[#101010] px-8 py-10 md:px-12 md:py-12">
+    <div class="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+      <div>
+        <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-brand-accent">
+          Early adopter pass
+        </p>
+        <h2 class="mt-4 text-4xl font-extrabold tracking-[-0.04em] text-white md:text-5xl">
+          First 1,000 pay once.
+          <span class="text-white/65">Everyone else pays monthly.</span>
+        </h2>
+        <!--
+          CHANGED FROM: "Get lifetime access before launch."
+          
+          STYLING NOTES:
+          "First 1,000 pay once." → text-white
+          "Everyone else pays monthly." → text-white/65
+          
+          WHY: This is the strongest conversion headline on the page and the
+          old version ("Get lifetime access before launch") completely undersells it.
+          The new version creates an in-group vs out-group dynamic in one sentence.
+          The reader immediately wants to be in the "pay once" group.
+        -->
+        <p class="mt-4 text-lg leading-8 text-brand-muted">
+          At launch, CleanStreak is $5.99/mo. Right now, the first 1,000 people on the waitlist lock in lifetime access for a single $29.99 payment — no subscription, ever. No payment due today.
+        </p>
+        <!--
+          CHANGED FROM: "When the app launches, standard pricing will be
+          subscription-based. The first 1,000 waitlist members can lock in
+          a one-time lifetime price."
+          
+          WHY: The old copy buries the monthly price and soft-pedals the scarcity.
+          The new copy leads with the monthly price ($5.99/mo) so the lifetime deal
+          ($29.99) looks even better by contrast. "No subscription, ever" is the
+          money phrase — it removes the #1 objection to software purchases.
+          "No payment due today" is reassurance that removes friction to signing up.
+        -->
+
+        <!-- Pricing comparison tiles -->
+        <div class="mt-8 flex flex-wrap gap-3">
+          <div class="rounded-[1rem] border border-white/8 bg-brand-panel px-5 py-4">
+            <p class="text-sm font-semibold text-white/55">At launch</p>
+            <p class="mt-1 text-3xl font-extrabold text-white">
+              $5.99<span class="text-lg text-white/55">/mo</span>
+            </p>
+            <!--
+              CHANGED FROM: strikethrough $49.99/yr
+              WHY: $5.99/mo is the real standard price at launch per your earlier message.
+              Show this clearly so $29.99 lifetime looks like the deal it is.
+              The tile label "At launch" sets up the contrast.
+            -->
+          </div>
+          <div class="rounded-[1rem] border border-brand-accent/20 bg-brand-accent/10 px-5 py-4">
+            <p class="text-sm font-semibold text-brand-accent">
+              First 1,000 only
+            </p>
+            <p class="mt-1 text-3xl font-extrabold text-white">
+              $29.99 <span class="text-lg text-white/55">lifetime</span>
+            </p>
+            <!--
+              CHANGED FROM: "Early adopter" label
+              WHY: "First 1,000 only" is more specific and creates more urgency
+              than "Early adopter" which is a category, not a limit.
+            -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Form — one copy change -->
+      <div class="rounded-[1rem] border border-white/6 bg-brand-panel p-4">
+        <form data-waitlist-form="bottom" class="space-y-4">
+          <input type="hidden" name="source" value="bottom" />
+          <label class="sr-only" for="email-bottom">Email address</label>
+          <input
+            type="email"
+            id="email-bottom"
+            name="email"
+            placeholder="name@example.com"
+            class="w-full rounded-[1rem] border border-white/8 bg-black/35 px-5 py-4 text-white outline-none transition placeholder:text-brand-muted focus:border-brand-accent focus:ring-1 focus:ring-brand-accent"
+            required
+          />
+          <button
+            type="submit"
+            class="w-full rounded-[1rem] bg-brand-accent px-6 py-4 text-base font-extrabold text-black transition hover:scale-[1.01] hover:shadow-glow active:scale-[0.98]"
+          >
+            Lock in lifetime pricing
+            <!-- CHANGED FROM: "Join waitlist for lifetime pricing"
+                 WHY: "Lock in" implies scarcity and action. You're securing something
+                 that could disappear. "Join waitlist" is passive. -->
+          </button>
+          <p id="success-bottom" class="hidden text-sm font-semibold text-brand-accent">
+            You're on the list! Check your email soon.
+          </p>
+        </form>
+
+        <div class="mt-6 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-[1rem] border border-white/6 bg-black/25 px-4 py-4 text-sm text-white/75">
+            <i class="fa-solid fa-check mr-2 text-brand-accent"></i>
+            No payment due today
+          </div>
+          <div class="rounded-[1rem] border border-white/6 bg-black/25 px-4 py-4 text-sm text-white/75">
+            <i class="fa-solid fa-check mr-2 text-brand-accent"></i>
+            No subscription. Ever.
+            <!-- CHANGED FROM: "Launch details sent by email"
+                 WHY: "No subscription. Ever." directly removes the #1 objection
+                 to software purchases at the exact moment someone is about to
+                 enter their email. This is more valuable reassurance than
+                 "launch details sent by email" which is implied anyway. -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     FOOTER — no copy changes needed
+     ============================================================ -->
